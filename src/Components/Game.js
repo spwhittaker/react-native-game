@@ -5,8 +5,9 @@ import RandomNumber from './RandomNumber';
 export default class Game extends Component {
   static propTypes = {
     randomNumberCount: PropTypes.number.isRequired,
+    initialSeconds: PropTypes.number.isRequired,
   };
-  state = {selectedNumbers: [0, 4]};
+  state = {selectedIds: [], remainingSeconds: this.props.initialSeconds};
   randomNumbers = Array.from({length: this.props.randomNumberCount}).map(
     () => 1 + Math.floor(Math.random() * 10),
   );
@@ -15,23 +16,73 @@ export default class Game extends Component {
     .reduce((acc, curr) => acc + curr, 0);
   // TODO: Shuffle random numbers
 
+  componentDidMount() {
+    this.intervalId = setInterval(() => {
+      this.setState(
+        (prevState) => {
+          return {remainingSeconds: prevState.remainingSeconds - 1};
+        },
+        () => {
+          if (this.state.remainingSeconds === 0) {
+            clearInterval(this.intervalId);
+          }
+        },
+      );
+    }, 1000);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this.intervalId);
+  }
   isNumberSelected = (numberIndex) => {
-    return this.state.selectedNumbers.indexOf(numberIndex) >= 0;
+    return this.state.selectedIds.indexOf(numberIndex) >= 0;
   };
+
+  selectNumber = (numberIndex) =>
+    this.setState((prevState) => {
+      return {selectedIds: [...prevState.selectedIds, numberIndex]};
+    });
+  gameStatus = () => {
+    const sumSelected = this.state.selectedIds.reduce(
+      (acc, curr) => acc + this.randomNumbers[curr],
+      0,
+    );
+    if (this.state.remainingSeconds === 0) {
+      return 'LOST';
+    }
+    if (sumSelected < this.target) {
+      return 'PLAYING';
+    }
+    if (sumSelected === this.target) {
+      return 'WON';
+    }
+    if (sumSelected > this.target) {
+      return 'LOST';
+    }
+  };
+
   render() {
+    const gameStatus = this.gameStatus();
     return (
       <View style={styles.container}>
-        <Text style={styles.target}>{this.target}</Text>
+        <Text style={[styles.target, styles[`STATUS_${gameStatus}`]]}>
+          {this.target}
+        </Text>
         <View style={styles.randomContainer}>
           {this.randomNumbers.map((randNum, index) => (
             <RandomNumber
               key={index}
+              id={index}
               number={randNum}
               styles={styles.random}
-              isSelected={this.isNumberSelected(index)}
+              isDisabled={
+                this.isNumberSelected(index) || gameStatus !== 'PLAYING'
+              }
+              onPress={this.selectNumber}
             />
           ))}
         </View>
+        <Text>{this.state.remainingSeconds}</Text>
       </View>
     );
   }
@@ -41,7 +92,7 @@ const styles = StyleSheet.create({
   target: {
     fontFamily: 'monospace',
     margin: 10,
-    color: 'purple',
+    color: 'black',
     fontSize: 40,
     backgroundColor: '#aaa',
     marginHorizontal: 50,
@@ -52,5 +103,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
+  },
+  STATUS_PLAYING: {
+    backgroundColor: '#ddd',
+  },
+  STATUS_WON: {
+    backgroundColor: 'green',
+  },
+  STATUS_LOST: {
+    backgroundColor: 'red',
   },
 });

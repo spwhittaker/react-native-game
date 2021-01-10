@@ -1,20 +1,23 @@
 import React, {Component} from 'react';
 import PropTypes from 'prop-types';
-import {Text, View, StyleSheet} from 'react-native';
+import {Text, View, StyleSheet, Button} from 'react-native';
 import RandomNumber from './RandomNumber';
+import shuffle from 'lodash/shuffle';
 export default class Game extends Component {
   static propTypes = {
     randomNumberCount: PropTypes.number.isRequired,
     initialSeconds: PropTypes.number.isRequired,
+    onPlayAgain: PropTypes.func.isRequired,
   };
   state = {selectedIds: [], remainingSeconds: this.props.initialSeconds};
+  gameStatus = 'PLAYING';
   randomNumbers = Array.from({length: this.props.randomNumberCount}).map(
     () => 1 + Math.floor(Math.random() * 10),
   );
   target = this.randomNumbers
     .slice(0, this.props.randomNumberCount - 2)
     .reduce((acc, curr) => acc + curr, 0);
-  // TODO: Shuffle random numbers
+  shuffledRandomNumbers = shuffle(this.randomNumbers);
 
   componentDidMount() {
     this.intervalId = setInterval(() => {
@@ -42,12 +45,24 @@ export default class Game extends Component {
     this.setState((prevState) => {
       return {selectedIds: [...prevState.selectedIds, numberIndex]};
     });
-  gameStatus = () => {
-    const sumSelected = this.state.selectedIds.reduce(
-      (acc, curr) => acc + this.randomNumbers[curr],
+
+  UNSAFE_componentWillUpdate(nextProps, nextState) {
+    if (
+      nextState.selectedIds !== this.state.selectedIds ||
+      nextState.remainingSeconds === 0
+    ) {
+      this.gameStatus = this.calcGameStatus(nextState);
+    }
+    if (this.gameStatus !== 'PLAYING') {
+      clearInterval(this.intervalId);
+    }
+  }
+  calcGameStatus = (nextState) => {
+    const sumSelected = nextState.selectedIds.reduce(
+      (acc, curr) => acc + this.shuffledRandomNumbers[curr],
       0,
     );
-    if (this.state.remainingSeconds === 0) {
+    if (nextState.remainingSeconds === 0) {
       return 'LOST';
     }
     if (sumSelected < this.target) {
@@ -62,14 +77,14 @@ export default class Game extends Component {
   };
 
   render() {
-    const gameStatus = this.gameStatus();
+    const gameStatus = this.gameStatus;
     return (
       <View style={styles.container}>
         <Text style={[styles.target, styles[`STATUS_${gameStatus}`]]}>
           {this.target}
         </Text>
         <View style={styles.randomContainer}>
-          {this.randomNumbers.map((randNum, index) => (
+          {this.shuffledRandomNumbers.map((randNum, index) => (
             <RandomNumber
               key={index}
               id={index}
@@ -82,6 +97,9 @@ export default class Game extends Component {
             />
           ))}
         </View>
+        {this.gameStatus !== 'PLAYING' && (
+          <Button title="Play again" onPress={this.props.onPlayAgain} />
+        )}
         <Text>{this.state.remainingSeconds}</Text>
       </View>
     );
